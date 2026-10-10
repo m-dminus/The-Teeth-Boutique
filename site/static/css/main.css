@@ -14,6 +14,7 @@
   --porcelain:#fcfbf8;
   --brass:#a07d47;
   --brass-bright:#c9a464;
+  --brass-ink:#7a5e33;   /* brass dark enough for small uppercase text: 5.5:1 on ivory, 4.6:1 on the hero gradient */
   --hairline:rgba(10,38,62,.18);
   --hairline-soft:rgba(10,38,62,.10);
   --hairline-ivory:rgba(247,244,238,.22);
@@ -62,7 +63,7 @@ p{margin:0 0 1.2em}
 .kicker{
   display:flex;align-items:center;gap:.65rem;
   font-size:.72rem;font-weight:600;letter-spacing:.24em;text-transform:uppercase;
-  color:var(--brass);margin-bottom:var(--sp-3);
+  color:var(--brass-ink);margin-bottom:var(--sp-3);
 }
 .kicker .star{flex:none}
 .kicker-num{color:var(--navy-soft);font-weight:500;letter-spacing:.18em}
@@ -185,7 +186,8 @@ a.card:hover{border-color:var(--navy);transform:translateY(-3px);color:inherit}
 .card .c-num{font-family:var(--serif);font-style:italic;font-size:1rem;color:var(--brass);letter-spacing:.05em}
 .card h3{margin:0;font-size:1.35rem}
 .card p{margin:0;font-size:.95rem;line-height:1.6}
-.card .c-more{margin-top:auto;padding-top:1rem;font-size:.74rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--brass)}
+.card .c-more{margin-top:auto;padding-top:1rem;font-size:.74rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--brass-ink)}
+.band-navy .kicker,.cta-band .kicker,.footer .kicker,.band-navy .card .c-more,.cta-band .card .c-more{color:var(--brass-bright)}
 .band-navy .card{background:rgba(247,244,238,.045);border-color:var(--hairline-ivory)}
 .band-navy .card h3{color:var(--ivory)}
 .band-navy .card p{color:rgba(247,244,238,.78)}
@@ -257,7 +259,7 @@ a.card:hover{border-color:var(--navy);transform:translateY(-3px);color:inherit}
 .cta-band .cta-tel a{color:var(--brass-bright);text-decoration:none}
 
 /* ---------- breadcrumbs ---------- */
-.crumbs{font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--navy-soft);padding:1.3rem 0 0}
+.crumbs{display:flex;flex-wrap:wrap;align-items:baseline;row-gap:.3rem;font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;color:var(--navy-soft);padding:1.3rem 0 0}
 .crumbs a{color:var(--navy-soft);text-decoration:none}
 .crumbs a:hover{color:var(--brass)}
 .crumbs span{margin:0 .5rem;color:var(--brass)}
@@ -308,7 +310,7 @@ table.tbl th{font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;colo
 .bk-root{border:1px solid var(--hairline);background:var(--porcelain);padding:clamp(1.2rem,3vw,2.2rem)}
 .bk-step{margin-top:1.6rem}
 .bk-step:first-child{margin-top:0}
-.bk-step-label{font:600 .72rem/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--brass);margin:0 0 .9rem}
+.bk-step-label{font:600 .72rem/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--brass-ink);margin:0 0 .9rem}
 .bk-pills{display:flex;flex-wrap:wrap;gap:.5rem}
 .bk-pill{font:600 .85rem/1.2 var(--sans);color:var(--navy);background:transparent;border:1px solid var(--hairline);border-radius:999px;padding:.6em 1.05em;cursor:pointer;transition:border-color .15s,background .15s,color .15s}
 .bk-pill:hover{border-color:var(--navy)}
