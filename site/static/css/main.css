@@ -201,7 +201,8 @@ a.card:hover{border-color:var(--navy);transform:translateY(-3px);color:inherit}
   transition:background .15s ease
 }
 .idx li a:hover{background:var(--porcelain)}
-.idx .i-num{font-family:var(--serif);font-style:italic;color:var(--brass);font-size:1.05rem}
+.idx .i-num{font-family:var(--serif);font-style:italic;color:var(--brass-ink);font-size:1.05rem} /* brass-ink: 5.5:1 on ivory; plain brass was 3.5:1 */
+.band-navy .idx .i-num,.cta-band .idx .i-num{color:var(--brass-bright)}
 .idx .i-name{font-family:var(--serif);font-size:clamp(1.2rem,2vw,1.5rem);font-weight:500}
 .idx .i-tag{font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--navy-soft)}
 @media(max-width:620px){.idx li a{grid-template-columns:2.4rem 1fr}.idx .i-tag{display:none}}
