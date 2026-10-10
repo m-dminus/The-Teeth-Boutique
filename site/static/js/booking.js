@@ -53,6 +53,10 @@
     for (var i = 0; i < REASONS.length; i++) if (REASONS[i].id === id) return REASONS[i];
     return null;
   }
+  // True for a string the Date parser accepts (the API's startsAt timestamps).
+  function isDateString(v) {
+    return typeof v === "string" && !isNaN(new Date(v).getTime());
+  }
 
   // ---------- demo availability (design preview only) ----------
   function demoAvailability(fromStr) {
@@ -122,8 +126,11 @@
     var box = root.querySelector(".bk-box") || root.appendChild(el("div", "bk-box"));
     box.innerHTML = "";
 
-    if (state.offline) { renderOffline(box); return; }
+    // A held time outranks an availability failure: both can be set when the
+    // user re-picks a reason while the request is in flight and that reload
+    // fails, and the confirmation is what matters then.
     if (state.done) { renderDone(box); return; }
+    if (state.offline) { renderOffline(box); return; }
 
     // Step 1 - reason
     var s1 = el("div", "bk-step");
@@ -204,6 +211,11 @@
       s3.appendChild(notice);
     }
     var slots = state.byDay[state.day] || [];
+    if (!slots.length) {
+      // Only reachable when a reload (after a 409) emptied the chosen day;
+      // without this the notice says "pick another slot" over an empty list.
+      s3.appendChild(el("p", "bk-note", "No other times are open on this day \u2014 pick another day above."));
+    }
     var groups = { Morning: [], Afternoon: [] };
     slots.forEach(function (iso) { groups[hourInChicago(iso) < 12 ? "Morning" : "Afternoon"].push(iso); });
     Object.keys(groups).forEach(function (g) {
@@ -262,9 +274,13 @@
     var btn = form.querySelector("button[type=submit]");
     btn.disabled = true; btn.textContent = "Holding\u2026";
 
+    // Snapshot the pick: step 1 stays clickable while the request is in
+    // flight, and a reason click resets state.day, which the confirmation
+    // card must not depend on.
+    var picked = { reason: state.reason, day: state.day, slot: state.slot };
     var data = {
-      reason: state.reason,
-      slotStart: state.slot,
+      reason: picked.reason,
+      slotStart: picked.slot,
       firstName: form.firstName.value.trim(),
       lastName: form.lastName.value.trim(),
       phone: form.phone.value.trim(),
@@ -277,7 +293,7 @@
 
     if (DEMO) {
       setTimeout(function () {
-        state.done = { startsAt: state.slot, demo: true };
+        state.done = { startsAt: picked.slot, reason: picked.reason, day: picked.day, demo: true };
         render(root);
       }, 350);
       return;
@@ -299,7 +315,19 @@
       .then(function (res) {
         var body = res.body || {};
         if (res.ok) {
-          state.done = { startsAt: body.startsAt || state.slot, id: body.requestId };
+          // A 2xx without a JSON object body is not a booking (a proxy or
+          // parked page answering for the API); treat it like any failure.
+          if (!res.body || typeof res.body !== "object" || Array.isArray(res.body)) {
+            throw new Error("bad body");
+          }
+          // Show the server's time when it is a real timestamp; a missing or
+          // malformed one falls back to the slot that was requested.
+          state.done = {
+            startsAt: isDateString(body.startsAt) ? body.startsAt : picked.slot,
+            id: body.requestId,
+            reason: picked.reason,
+            day: picked.day
+          };
           render(root);
         } else if (res.status === 409) {
           // The slot was taken between pick and submit. The availability
@@ -324,7 +352,10 @@
     var c = el("div", "bk-confirm");
     c.appendChild(el("p", "bk-confirm-mark", "\u2713"));
     c.appendChild(el("h3", null, "Your time is held"));
-    c.appendChild(el("p", null, reasonById(state.reason).label + " \u2014 " + fmtDayLong(state.day) + " at " + fmtTime(state.done.startsAt) + "."));
+    var done = state.done;
+    var reason = reasonById(done.reason);
+    var day = done.day || chicagoDateStr(new Date(done.startsAt));
+    c.appendChild(el("p", null, (reason ? reason.label : "Your visit") + " \u2014 " + fmtDayLong(day) + " at " + fmtTime(done.startsAt) + "."));
     c.appendChild(el("p", null, "The front desk will reach out to confirm it. Bring prior X-rays if you have them, your medication list, and your insurance details."));
     if (state.done.demo) {
       c.appendChild(el("p", "bk-note", "Design preview \u2014 no request was sent."));
