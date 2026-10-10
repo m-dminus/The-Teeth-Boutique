@@ -18,7 +18,9 @@
     { id: "other", label: "Something else", minutes: 30 }
   ];
 
-  var state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false };
+  // notice: a one-line message shown under step 3 (e.g. the slot was taken
+  // between pick and submit). Cleared whenever the user picks again.
+  var state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false, notice: null };
 
   // ---------- date helpers ----------
   function chicagoDateStr(d) {
@@ -50,6 +52,10 @@
   function reasonById(id) {
     for (var i = 0; i < REASONS.length; i++) if (REASONS[i].id === id) return REASONS[i];
     return null;
+  }
+  // True for a string the Date parser accepts (the API's startsAt timestamps).
+  function isDateString(v) {
+    return typeof v === "string" && !isNaN(new Date(v).getTime());
   }
 
   // ---------- demo availability (design preview only) ----------
@@ -120,8 +126,11 @@
     var box = root.querySelector(".bk-box") || root.appendChild(el("div", "bk-box"));
     box.innerHTML = "";
 
-    if (state.offline) { renderOffline(box); return; }
+    // A held time outranks an availability failure: both can be set when the
+    // user re-picks a reason while the request is in flight and that reload
+    // fails, and the confirmation is what matters then.
     if (state.done) { renderDone(box); return; }
+    if (state.offline) { renderOffline(box); return; }
 
     // Step 1 - reason
     var s1 = el("div", "bk-step");
@@ -132,7 +141,7 @@
       b.type = "button";
       b.setAttribute("aria-pressed", state.reason === r.id ? "true" : "false");
       b.addEventListener("click", function () {
-        state.reason = r.id; state.day = null; state.slot = null; state.offset = 0;
+        state.reason = r.id; state.day = null; state.slot = null; state.offset = 0; state.notice = null;
         loadAvailability(root, function () { render(root); });
       });
       pills.appendChild(b);
@@ -182,7 +191,7 @@
       if (has) {
         (function (dstr) {
           b2.addEventListener("click", function () {
-            state.day = dstr; state.slot = null; render(root);
+            state.day = dstr; state.slot = null; state.notice = null; render(root);
           });
         })(dayStr);
       }
@@ -196,7 +205,17 @@
     // Step 3 - time
     var s3 = el("div", "bk-step");
     s3.appendChild(el("p", "bk-step-label", "3 \u00b7 Pick a time \u2014 " + fmtDayLong(state.day)));
+    if (state.notice) {
+      var notice = el("p", "bk-error bk-notice", state.notice);
+      notice.setAttribute("role", "alert");
+      s3.appendChild(notice);
+    }
     var slots = state.byDay[state.day] || [];
+    if (!slots.length) {
+      // Only reachable when a reload (after a 409) emptied the chosen day;
+      // without this the notice says "pick another slot" over an empty list.
+      s3.appendChild(el("p", "bk-note", "No other times are open on this day \u2014 pick another day above."));
+    }
     var groups = { Morning: [], Afternoon: [] };
     slots.forEach(function (iso) { groups[hourInChicago(iso) < 12 ? "Morning" : "Afternoon"].push(iso); });
     Object.keys(groups).forEach(function (g) {
@@ -207,7 +226,7 @@
         var tb = el("button", "bk-pill bk-time", fmtTime(iso));
         tb.type = "button";
         tb.setAttribute("aria-pressed", state.slot === iso ? "true" : "false");
-        tb.addEventListener("click", function () { state.slot = iso; render(root); });
+        tb.addEventListener("click", function () { state.slot = iso; state.notice = null; render(root); });
         tp.appendChild(tb);
       });
       s3.appendChild(tp);
@@ -251,12 +270,17 @@
   function submit(root, form) {
     var err = form.querySelector(".bk-error");
     err.hidden = true;
+    state.notice = null;
     var btn = form.querySelector("button[type=submit]");
     btn.disabled = true; btn.textContent = "Holding\u2026";
 
+    // Snapshot the pick: step 1 stays clickable while the request is in
+    // flight, and a reason click resets state.day, which the confirmation
+    // card must not depend on.
+    var picked = { reason: state.reason, day: state.day, slot: state.slot };
     var data = {
-      reason: state.reason,
-      slotStart: state.slot,
+      reason: picked.reason,
+      slotStart: picked.slot,
       firstName: form.firstName.value.trim(),
       lastName: form.lastName.value.trim(),
       phone: form.phone.value.trim(),
@@ -269,7 +293,7 @@
 
     if (DEMO) {
       setTimeout(function () {
-        state.done = { startsAt: state.slot, demo: true };
+        state.done = { startsAt: picked.slot, reason: picked.reason, day: picked.day, demo: true };
         render(root);
       }, 350);
       return;
@@ -279,15 +303,38 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+    }).then(function (r) {
+      // Read the body as text and parse it ourselves so a non-JSON body
+      // (a proxy error page, an empty 409) still reaches the status check.
+      return r.text().then(function (t) {
+        var j = null;
+        try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+        return { ok: r.ok, status: r.status, body: j };
+      });
+    })
       .then(function (res) {
+        var body = res.body || {};
         if (res.ok) {
-          state.done = { startsAt: res.body.startsAt, id: res.body.requestId };
+          // A 2xx without a JSON object body is not a booking (a proxy or
+          // parked page answering for the API); treat it like any failure.
+          if (!res.body || typeof res.body !== "object" || Array.isArray(res.body)) {
+            throw new Error("bad body");
+          }
+          // Show the server's time when it is a real timestamp; a missing or
+          // malformed one falls back to the slot that was requested.
+          state.done = {
+            startsAt: isDateString(body.startsAt) ? body.startsAt : picked.slot,
+            id: body.requestId,
+            reason: picked.reason,
+            day: picked.day
+          };
           render(root);
         } else if (res.status === 409) {
-          err.textContent = (res.body && res.body.error) || "That time was just taken \u2014 pick another slot.";
-          err.hidden = false;
-          btn.disabled = false; btn.textContent = "Hold this time";
+          // The slot was taken between pick and submit. The availability
+          // reload below re-renders the box and tears down this form, so
+          // the message lives in state and renders under step 3.
+          state.notice = (typeof body.error === "string" && body.error) ||
+                         "That time was just taken \u2014 pick another slot";
           state.slot = null;
           loadAvailability(root, function () { render(root); });
         } else {
@@ -305,7 +352,10 @@
     var c = el("div", "bk-confirm");
     c.appendChild(el("p", "bk-confirm-mark", "\u2713"));
     c.appendChild(el("h3", null, "Your time is held"));
-    c.appendChild(el("p", null, reasonById(state.reason).label + " \u2014 " + fmtDayLong(state.day) + " at " + fmtTime(state.done.startsAt) + "."));
+    var done = state.done;
+    var reason = reasonById(done.reason);
+    var day = done.day || chicagoDateStr(new Date(done.startsAt));
+    c.appendChild(el("p", null, (reason ? reason.label : "Your visit") + " \u2014 " + fmtDayLong(day) + " at " + fmtTime(done.startsAt) + "."));
     c.appendChild(el("p", null, "The front desk will reach out to confirm it. Bring prior X-rays if you have them, your medication list, and your insurance details."));
     if (state.done.demo) {
       c.appendChild(el("p", "bk-note", "Design preview \u2014 no request was sent."));
@@ -315,7 +365,7 @@
     var again = el("button", "bk-navbtn", "Book another time");
     again.type = "button";
     again.addEventListener("click", function () {
-      state.done = null; state.slot = null; state.day = null;
+      state.done = null; state.slot = null; state.day = null; state.notice = null;
       loadAvailability(again.closest(".bk-root") || document.getElementById("bk-root"), function () {
         render(document.getElementById("bk-root"));
       });
@@ -338,7 +388,7 @@
     var root = document.getElementById("bk-root");
     if (!root) return;
     // fresh state per page render (the preview re-renders the page on route change)
-    state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false };
+    state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false, notice: null };
     root.innerHTML = "";
     root.className = "bk-root";
     render(root);
