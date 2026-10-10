@@ -18,7 +18,9 @@
     { id: "other", label: "Something else", minutes: 30 }
   ];
 
-  var state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false };
+  // notice: a one-line message shown under step 3 (e.g. the slot was taken
+  // between pick and submit). Cleared whenever the user picks again.
+  var state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false, notice: null };
 
   // ---------- date helpers ----------
   function chicagoDateStr(d) {
@@ -132,7 +134,7 @@
       b.type = "button";
       b.setAttribute("aria-pressed", state.reason === r.id ? "true" : "false");
       b.addEventListener("click", function () {
-        state.reason = r.id; state.day = null; state.slot = null; state.offset = 0;
+        state.reason = r.id; state.day = null; state.slot = null; state.offset = 0; state.notice = null;
         loadAvailability(root, function () { render(root); });
       });
       pills.appendChild(b);
@@ -182,7 +184,7 @@
       if (has) {
         (function (dstr) {
           b2.addEventListener("click", function () {
-            state.day = dstr; state.slot = null; render(root);
+            state.day = dstr; state.slot = null; state.notice = null; render(root);
           });
         })(dayStr);
       }
@@ -196,6 +198,11 @@
     // Step 3 - time
     var s3 = el("div", "bk-step");
     s3.appendChild(el("p", "bk-step-label", "3 \u00b7 Pick a time \u2014 " + fmtDayLong(state.day)));
+    if (state.notice) {
+      var notice = el("p", "bk-error bk-notice", state.notice);
+      notice.setAttribute("role", "alert");
+      s3.appendChild(notice);
+    }
     var slots = state.byDay[state.day] || [];
     var groups = { Morning: [], Afternoon: [] };
     slots.forEach(function (iso) { groups[hourInChicago(iso) < 12 ? "Morning" : "Afternoon"].push(iso); });
@@ -207,7 +214,7 @@
         var tb = el("button", "bk-pill bk-time", fmtTime(iso));
         tb.type = "button";
         tb.setAttribute("aria-pressed", state.slot === iso ? "true" : "false");
-        tb.addEventListener("click", function () { state.slot = iso; render(root); });
+        tb.addEventListener("click", function () { state.slot = iso; state.notice = null; render(root); });
         tp.appendChild(tb);
       });
       s3.appendChild(tp);
@@ -251,6 +258,7 @@
   function submit(root, form) {
     var err = form.querySelector(".bk-error");
     err.hidden = true;
+    state.notice = null;
     var btn = form.querySelector("button[type=submit]");
     btn.disabled = true; btn.textContent = "Holding\u2026";
 
@@ -279,15 +287,26 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
-    }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, status: r.status, body: j }; }); })
+    }).then(function (r) {
+      // Read the body as text and parse it ourselves so a non-JSON body
+      // (a proxy error page, an empty 409) still reaches the status check.
+      return r.text().then(function (t) {
+        var j = null;
+        try { j = t ? JSON.parse(t) : null; } catch (e) { j = null; }
+        return { ok: r.ok, status: r.status, body: j };
+      });
+    })
       .then(function (res) {
+        var body = res.body || {};
         if (res.ok) {
-          state.done = { startsAt: res.body.startsAt, id: res.body.requestId };
+          state.done = { startsAt: body.startsAt || state.slot, id: body.requestId };
           render(root);
         } else if (res.status === 409) {
-          err.textContent = (res.body && res.body.error) || "That time was just taken \u2014 pick another slot.";
-          err.hidden = false;
-          btn.disabled = false; btn.textContent = "Hold this time";
+          // The slot was taken between pick and submit. The availability
+          // reload below re-renders the box and tears down this form, so
+          // the message lives in state and renders under step 3.
+          state.notice = (typeof body.error === "string" && body.error) ||
+                         "That time was just taken \u2014 pick another slot";
           state.slot = null;
           loadAvailability(root, function () { render(root); });
         } else {
@@ -315,7 +334,7 @@
     var again = el("button", "bk-navbtn", "Book another time");
     again.type = "button";
     again.addEventListener("click", function () {
-      state.done = null; state.slot = null; state.day = null;
+      state.done = null; state.slot = null; state.day = null; state.notice = null;
       loadAvailability(again.closest(".bk-root") || document.getElementById("bk-root"), function () {
         render(document.getElementById("bk-root"));
       });
@@ -338,7 +357,7 @@
     var root = document.getElementById("bk-root");
     if (!root) return;
     // fresh state per page render (the preview re-renders the page on route change)
-    state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false };
+    state = { reason: null, offset: 0, day: null, slot: null, byDay: {}, loading: false, notice: null };
     root.innerHTML = "";
     root.className = "bk-root";
     render(root);

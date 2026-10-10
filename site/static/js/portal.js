@@ -9,6 +9,21 @@
   var DEMO = !!window.TB_BOOKING_DEMO;
   var state = { view: "signin", tab: "overview", me: null, email: "" };
 
+  // Shown on the Billing tab whenever online payment is not offered.
+  var PAY_OFFLINE_TEXT = "Pay by phone (773-857-2290) or at the desk. Payment plans and CareCredit are available.";
+
+  // The Stripe publishable key, or "" unless window.TB_STRIPE_PK looks like a
+  // real one. The placeholder shipped in the HTML ("pk_live_REPLACE_ME") and
+  // demo/sample values keep the pay box - and the Stripe script - off the page.
+  function stripeKey() {
+    var k = window.TB_STRIPE_PK;
+    if (typeof k !== "string") return "";
+    k = k.trim();
+    if (!/^pk_(live|test)_[A-Za-z0-9]{16,}$/.test(k)) return "";
+    if (/replace|placeholder|demo|sample|example|changeme/i.test(k)) return "";
+    return k;
+  }
+
   function api(path, method, body) {
     return fetch(API + "/api/portal" + path, {
       method: method || "GET",
@@ -29,7 +44,7 @@
     return n;
   }
   function money(cents) {
-    return "$" + (cents / 100).toFixed(2);
+    return "$" + ((Number(cents) || 0) / 100).toFixed(2);
   }
   function fmtDT(iso) {
     return new Intl.DateTimeFormat("en-US", { timeZone: "America/Chicago", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(iso));
@@ -317,29 +332,36 @@
         body.appendChild(el("p", "bk-note", r.body.message || "Billing appears here once your account is linked to your chart."));
         return;
       }
-      var d = r.body;
+      var d = r.body || {};
+      var balance = Number(d.balanceCents) || 0;
+      var key = stripeKey();
+      // Online payment only with a real publishable key, a balance to pay, and
+      // outside the design preview; everything else points at phone/desk.
+      var canPay = balance > 0 && !DEMO && !!key;
       var grid = el("div", "pt-grid");
-      grid.appendChild(statCard("Current balance", money(d.balanceCents),
-        d.balanceCents > 0 ? "Pay below, by phone (773-857-2290), or at the desk. Payment plans and CareCredit are available \u2014 ask us." : "Nothing owed right now."));
+      grid.appendChild(statCard("Current balance", money(balance),
+        balance > 0
+          ? (canPay ? "Pay below, by phone (773-857-2290), or at the desk. Payment plans and CareCredit are available \u2014 ask us." : PAY_OFFLINE_TEXT)
+          : "Nothing owed right now."));
       body.appendChild(grid);
 
-      if (d.balanceCents > 0 && window.TB_STRIPE_PK && !DEMO) {
-        body.appendChild(payBox(d.balanceCents, root));
+      if (canPay) {
+        body.appendChild(payBox(balance, key, root));
       }
 
       section("Charges", d.charges, function (c) {
-        return [ (c.description || "Charge") + (c.service_date ? " \u2014 " + fmtD(c.service_date) : ""), money(c.amount_cents) + " \u00b7 " + c.status ];
+        return [ (c.description || "Charge") + (c.service_date ? " \u2014 " + fmtD(c.service_date) : ""), money(c.amount_cents) + " \u00b7 " + (c.status || "") ];
       });
       section("Payments", d.payments, function (p) {
-        return [ fmtD(p.created_at) + (p.last_four ? " \u00b7 " + (p.card_brand || "card") + " \u00b7\u00b7\u00b7\u00b7" + p.last_four : ""), money(p.amount_cents) + " \u00b7 " + p.status ];
+        return [ fmtD(p.created_at) + (p.last_four ? " \u00b7 " + (p.card_brand || "card") + " \u00b7\u00b7\u00b7\u00b7" + p.last_four : ""), money(p.amount_cents) + " \u00b7 " + (p.status || "") ];
       });
       section("Insurance claims", d.claims, function (c) {
-        return [ (c.claim_number || "Claim") + " \u2014 " + (c.insurance_provider || "") + " \u00b7 " + fmtD(c.service_date), money(c.claim_total_cents) + " \u00b7 " + c.status ];
+        return [ (c.claim_number || "Claim") + " \u2014 " + (c.insurance_provider || "") + " \u00b7 " + fmtD(c.service_date), money(c.claim_total_cents) + " \u00b7 " + (c.status || "") ];
       });
 
       function section(title, rows, map) {
         body.appendChild(el("h3", "pt-h3", title));
-        if (!rows.length) { body.appendChild(el("p", "bk-note", "None on file.")); return; }
+        if (!Array.isArray(rows) || !rows.length) { body.appendChild(el("p", "bk-note", "None on file.")); return; }
         var list = el("div", "pt-list");
         rows.forEach(function (x) {
           var pair = map(x);
@@ -350,10 +372,12 @@
         });
         body.appendChild(list);
       }
+    }).catch(function () {
+      body.appendChild(el("p", "bk-note", "Billing could not be loaded right now \u2014 call 773-857-2290 and a person will help directly."));
     });
   }
 
-  function payBox(balanceCents, root) {
+  function payBox(balanceCents, key, root) {
     var box = el("div", "pt-pay");
     box.appendChild(el("h3", "pt-h3", "Pay online"));
     var f = el("form", "bk-form");
@@ -374,11 +398,20 @@
     box.appendChild(f);
 
     var stripeObj, cardEl;
+    function unavailable() {
+      stripeObj = null; cardEl = null;
+      f.hidden = true;
+      box.appendChild(el("p", "bk-note", "Online payment is unavailable right now. " + PAY_OFFLINE_TEXT));
+    }
     loadStripe(function (ok) {
-      if (!ok) { box.hidden = true; return; }
-      stripeObj = window.Stripe(window.TB_STRIPE_PK);
-      cardEl = stripeObj.elements().create("card");
-      cardEl.mount(cardWrap);
+      if (!ok || typeof window.Stripe !== "function") { unavailable(); return; }
+      try {
+        stripeObj = window.Stripe(key);
+        cardEl = stripeObj.elements().create("card");
+        cardEl.mount(cardWrap);
+      } catch (ex) {
+        unavailable();
+      }
     });
 
     f.addEventListener("submit", function (e) {
