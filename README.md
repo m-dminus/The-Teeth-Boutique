@@ -83,8 +83,17 @@ To go back to the old site: switch the nameservers at GoDaddy back to `ns1.pbhsd
 
 ## Checks before launch
 
-Serve `site/` with any static file server and browse it. Results on 2026-10-10 (commit on `main` after the
-audit fixes):
+Serve `site/` with any static file server and browse it. Results on 2026-11-07, after the launch cleanup
+(empty photo frames removed, Smile Gallery hidden, footer gutter fixed, draft labels removed):
+
+- 4,806 internal links, sources and redirect targets across all 153 HTML files resolve; 0 broken. All 65
+  redirect pages land on their `tools/redirects.csv` target, and the 86 `sitemap.xml` URLs are all real pages.
+- 88 pages at 390 px and 1280 px in Chromium: 0 page errors, 0 console errors other than the expected
+  `api.theteethboutique.com` call on `/portal/`, 0 failed same-origin requests, 0 horizontal overflow.
+- The footer text lines up with the page content at every width (it touched the screen edge below 1200 px).
+
+Earlier results on 2026-10-10 (commit on `main` after the audit fixes; page counts are from before the
+Smile Gallery was hidden):
 
 - A crawl of every internal link and asset from `/` found 0 broken links and 0 page errors and reached 87
   pages; the only page not linked from anywhere is `/staff/`, on purpose. Every redirect page's target exists.
