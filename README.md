@@ -5,9 +5,9 @@ https://www.theteethboutique.com with GitHub Pages.
 
 | Path | What it is |
 | --- | --- |
-| `site/` | The 89 built pages, one folder per URL, plus `404.html`, `sitemap.xml`, `robots.txt`, `static/` (CSS, JS, logos, the four fillable PDFs), `.nojekyll` and a `CNAME` file. This folder is published as is. (GitHub ignores the `CNAME` file when a site is published by a GitHub Actions workflow, as this one is; it is kept only for a branch-based deploy.) |
-| `site/patient-information/…` and the other legacy folders | 64 small pages, one per address of the old site, that send the visitor on to the new address (`tools/redirects.csv` lists them). GitHub Pages cannot send server-side 301s, so these pages do the job with an instant `meta refresh`, a `canonical` link to the new address and `noindex`. |
-| `site/.htaccess`, `site/_redirects` | The same 64 redirects for an Apache or Netlify host. Not published here (the workflow leaves them out). |
+| `site/` | The 88 built pages, one folder per URL, plus `404.html`, `sitemap.xml`, `robots.txt`, `static/` (CSS, JS, logos, the four fillable PDFs), `.nojekyll` and a `CNAME` file. This folder is published as is. (GitHub ignores the `CNAME` file when a site is published by a GitHub Actions workflow, as this one is; it is kept only for a branch-based deploy.) |
+| `site/patient-information/…` and the other legacy folders | 64 small pages, one per address of the old site, that send the visitor on to the new address, plus one that sends `/about/smile-gallery/` to `/about/` while the gallery has no photographs (`tools/redirects.csv` lists all 65). GitHub Pages cannot send server-side 301s, so these pages do the job with an instant `meta refresh`, a `canonical` link to the new address and `noindex`. |
+| `site/.htaccess`, `site/_redirects` | The same 65 redirects for an Apache or Netlify host. Not published here (the workflow leaves them out). |
 | `tools/make_redirect_pages.py` | Regenerates the redirect pages from `tools/redirects.csv`. Run it from the repository root after changing the list. |
 | `.github/workflows/pages.yml` | Publishes `site/` on every push to `main`, or from the Actions tab. |
 
@@ -38,7 +38,10 @@ is at Proton Mail and must keep working, so every mail record below is copied fr
    option of `actions/configure-pages` needs a personal access token, not the workflow's built-in token, so
    until Pages is switched on here every run fails at "Get Pages site failed".
 2. **Run the workflow** (Actions tab → "Deploy site to GitHub Pages" → Run workflow), or merge anything to
-   `main`. The site is then served at `https://m-dminus.github.io/The-Teeth-Boutique/` for review.
+   `main`. The site is then served at `https://m-dminus.github.io/The-Teeth-Boutique/`. That address only
+   proves the deploy ran: it shows the pages unstyled, with dead menu links, because every page, stylesheet and
+   link path starts at the domain root (`/static/...`, `/services/`), and on `github.io` the root is not this
+   site. Do not judge the site there. Judge it on `https://www.theteethboutique.com` after step 5.
 3. **GoDaddy → the domain → DNS → Nameservers → change to GoDaddy's default nameservers.** This takes the zone
    away from the old vendor. Before saving, confirm DNSSEC is off (it is, as of 2026-10-09: no DS record).
 4. **GoDaddy → DNS records.** Delete whatever GoDaddy pre-fills for `@` and `www` (parking/forwarding records),

@@ -211,6 +211,9 @@ a.card:hover{border-color:var(--navy);transform:translateY(-3px);color:inherit}
 .feature{display:grid;grid-template-columns:1fr 1fr;gap:clamp(2rem,5vw,4.5rem);align-items:center}
 .feature.rev>*:first-child{order:2}
 @media(max-width:880px){.feature{grid-template-columns:1fr}.feature.rev>*:first-child{order:0}}
+/* one column, for sections that have no photograph yet */
+.feature.solo,.hero-grid.solo{grid-template-columns:1fr}
+.feature.solo>*{max-width:46rem}
 
 /* ---------- steps ---------- */
 .steps{list-style:none;margin:0;padding:0;counter-reset:step}
@@ -278,7 +281,7 @@ a.card:hover{border-color:var(--navy);transform:translateY(-3px);color:inherit}
 
 /* ---------- footer ---------- */
 .footer{background:var(--navy-deep);color:rgba(247,244,238,.82);font-size:.95rem}
-.footer-main{display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr;gap:clamp(2rem,4vw,3.5rem);padding:clamp(3rem,6vw,5rem) 0}
+.footer-main{display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr;gap:clamp(2rem,4vw,3.5rem);padding-top:clamp(3rem,6vw,5rem);padding-bottom:clamp(3rem,6vw,5rem)}
 @media(max-width:960px){.footer-main{grid-template-columns:1fr 1fr}}
 @media(max-width:620px){.footer-main{grid-template-columns:1fr}}
 .footer img.f-logo{height:52px;width:auto;margin-bottom:1.2rem}
@@ -289,7 +292,7 @@ a.card:hover{border-color:var(--navy);transform:translateY(-3px);color:inherit}
 .footer a{color:rgba(247,244,238,.82);text-decoration:none}
 .footer a:hover{color:var(--brass-bright)}
 .footer address{font-style:normal;line-height:1.8}
-.footer-legal{border-top:1px solid var(--hairline-ivory);padding:1.4rem 0;display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;font-size:.8rem;color:rgba(247,244,238,.55)}
+.footer-legal{border-top:1px solid var(--hairline-ivory);padding-top:1.4rem;padding-bottom:1.4rem;display:flex;flex-wrap:wrap;justify-content:space-between;gap:1rem;font-size:.8rem;color:rgba(247,244,238,.55)}
 .footer-legal a{color:rgba(247,244,238,.55)}
 .footer-legal nav{display:flex;gap:1.4rem;flex-wrap:wrap}
 
