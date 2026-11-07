@@ -61,7 +61,8 @@ Redirect 301 /cosmetic-dentistry/dermal-fillers/ /services/facial-aesthetics/der
 Redirect 301 /about-us/ /about/
 Redirect 301 /about-us/meet-our-doctors/ /about/dr-rizwana-maskatiya/
 Redirect 301 /about-us/dr-rizwana-maskatiya/ /about/dr-rizwana-maskatiya/
-Redirect 301 /about-us/smile-gallery/ /about/smile-gallery/
+Redirect 301 /about-us/smile-gallery/ /about/
+Redirect 302 /about/smile-gallery/ /about/
 Redirect 301 /sitemap/ /
 Redirect 301 /disclaimer/termsandconditions/ /terms/
 Redirect 301 /disclaimer/privacy-policy/ /privacy/
